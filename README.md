@@ -2,6 +2,10 @@
 
 Custom AI chatbots for NGOs, no‑code deployment
 
+## For NGO Beneficiaries
+
+Chatmosaic enables NGOs to offer accessible, multilingual chatbot conversations that beneficiaries can use in their preferred language. Voice-enabled interactions let people speak to the chatbot and hear responses, making it easier to access support when typing is difficult or inconvenient. These conversations can help beneficiaries find relevant information and connect with NGO services.
+
 ## Tech Stack
 
 - [Next.js](https://nextjs.org) - React framework
