@@ -26,6 +26,8 @@ import {
 
 type DocumentItem = { id?: string; name: string; size: string; type: string; status: "Stored" | "Uploading" };
 type ChatMessage = { role: "user" | "assistant"; text: string; source?: string };
+type AssistantSettings = { id: string; organizationName: string; welcomeMessage: string; primaryColor: string; websiteUrl: string; public: boolean };
+const defaultSettings: AssistantSettings = { id: "greenway-aid", organizationName: "Greenway Aid", welcomeMessage: "Hi there! I’m here to help with questions about Greenway Aid. What would you like to know?", primaryColor: "#477b5d", websiteUrl: "", public: true };
 
 const suggestedQuestions = [
   "How can I become a volunteer?",
@@ -69,6 +71,7 @@ function answerFor(question: string, documents: DocumentItem[]) {
 
 export default function Home() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [settings, setSettings] = useState<AssistantSettings>(defaultSettings);
   const [uploading, setUploading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [question, setQuestion] = useState("");
@@ -76,6 +79,20 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("Knowledge base");
   const [notice, setNotice] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+
+  useState(() => {
+    fetch("/api/assistant").then((response) => response.json()).then((data) => {
+      if (data.assistant) setSettings(data.assistant);
+      if (data.documents) setDocuments(data.documents.map((doc: { id: string; name: string; size: number; type: string }) => ({ ...doc, size: formatSize(doc.size), status: "Stored" as const })));
+    }).catch(() => undefined);
+  });
+
+  async function saveSettings(next: AssistantSettings) {
+    setSettings(next);
+    const response = await fetch("/api/assistant", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) });
+    if (!response.ok) setNotice("Could not save assistant settings. Please try again.");
+    else setNotice("Assistant settings saved.");
+  }
 
   async function addFiles(files: FileList | null) {
     if (!files?.length || uploading) return;
@@ -133,13 +150,18 @@ export default function Home() {
   function askQuestion(value: string) {
     const trimmed = value.trim();
     if (!trimmed) return;
-    const answer = answerFor(trimmed, documents);
-    setMessages((current) => [
-      ...current,
-      { role: "user", text: trimmed },
-      { role: "assistant", text: answer.text, source: answer.source },
-    ]);
+    setMessages((current) => [...current, { role: "user", text: trimmed }]);
     setQuestion("");
+    fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assistantId: settings.id, message: trimmed }) })
+      .then(async (response) => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Could not get an answer.");
+        setMessages((current) => [...current, { role: "assistant", text: result.answer, source: result.sources?.join(", ") }]);
+      })
+      .catch(() => {
+        const answer = answerFor(trimmed, documents);
+        setMessages((current) => [...current, { role: "assistant", text: answer.text, source: answer.source }]);
+      });
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -157,8 +179,8 @@ export default function Home() {
           <span>kindred<span className="brand-period">.</span></span>
         </a>
         <div className="workspace-switcher">
-          <span className="workspace-avatar">G</span>
-          <span className="workspace-copy"><strong>Greenway Aid</strong><small>Free workspace</small></span>
+          <span className="workspace-avatar">{settings.organizationName.slice(0, 1).toUpperCase()}</span>
+          <span className="workspace-copy"><strong>{settings.organizationName}</strong><small>Free workspace</small></span>
           <ChevronDown size={15} />
         </div>
         <div className="side-label">WORKSPACE</div>
@@ -176,7 +198,11 @@ export default function Home() {
       <section className="main-area" id="home">
         <header className="topbar"><div className="breadcrumb">Greenway Aid <span>/</span> <strong>{activeTab}</strong></div><div className="topbar-right"><span className="secure-label"><ShieldCheck size={15} /> Your data is private</span><button className="icon-button" aria-label="Open settings" onClick={() => setActiveTab("Settings")}><Settings2 size={18} /></button></div></header>
         <div className="content-wrap">
-          <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR AI ASSISTANT</div><h1>Knowledge base</h1><p className="page-subtitle">Teach your assistant about your work, one document at a time.</p></div><button className="share-button" onClick={() => setNotice("Your assistant preview link is ready to share.")}><ArrowUpRight size={15} /> Share assistant</button></div>
+          <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-dot" /> YOUR AI ASSISTANT</div><h1>{activeTab === "Settings" ? "Assistant settings" : activeTab === "Chat preview" ? "Chat preview" : "Knowledge base"}</h1><p className="page-subtitle">{activeTab === "Settings" ? "Make your assistant feel like your organization." : "Teach your assistant about your work, one document at a time."}</p></div><button className="share-button" onClick={() => { navigator.clipboard?.writeText(`<script src="${window.location.origin}/widget.js" data-chatbot-id="${settings.id}" async></script>`); setNotice("Embed code copied to clipboard."); }}><ArrowUpRight size={15} /> Copy embed code</button></div>
+
+          {activeTab === "Settings" && <section className="panel" style={{ padding: 22, marginBottom: 18 }}><h2>Brand your assistant</h2><p className="page-subtitle" style={{ margin: "6px 0 18px" }}>These details appear in your website chat widget.</p><div style={{ display: "grid", gap: 14, maxWidth: 560 }}><label>Organization name<input className="settings-input" value={settings.organizationName} onChange={(event) => setSettings({ ...settings, organizationName: event.target.value })} /></label><label>Welcome message<textarea className="settings-input" rows={3} value={settings.welcomeMessage} onChange={(event) => setSettings({ ...settings, welcomeMessage: event.target.value })} /></label><label>Brand color<div style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="color" value={settings.primaryColor} onChange={(event) => setSettings({ ...settings, primaryColor: event.target.value })} /><span>{settings.primaryColor}</span></div></label><label>Allowed website (optional)<input className="settings-input" placeholder="https://your-ngo.org" value={settings.websiteUrl} onChange={(event) => setSettings({ ...settings, websiteUrl: event.target.value })} /></label><button className="small-add-button" onClick={() => void saveSettings(settings)}>Save settings</button></div><h3 style={{ marginTop: 26 }}>Website embed</h3><pre className="embed-code">{`<script src="${typeof window !== "undefined" ? window.location.origin : "https://your-domain.org"}/widget.js" data-chatbot-id="${settings.id}" async></script>`}</pre><button className="small-add-button" onClick={() => { navigator.clipboard?.writeText(`<script src="${window.location.origin}/widget.js" data-chatbot-id="${settings.id}" async></script>`); setNotice("Embed code copied to clipboard."); }}>Copy code</button></section>}
+
+          {activeTab !== "Settings" && <>
 
           <div className="overview-row">
             <div className="overview-card"><span className="overview-icon green"><BookOpen size={18} /></span><div><span className="overview-label">DOCUMENTS</span><strong>{documents.length.toString().padStart(2, "0")}</strong></div><span className="overview-note"><span className="live-dot" /> Up to date</span></div>
@@ -210,7 +236,7 @@ export default function Home() {
           </div>
 
           <div className="bottom-note"><span className="bottom-note-icon"><Globe2 size={16} /></span><span><strong>Made for the work that matters.</strong> Your assistant is grounded in your organization’s knowledge, so your community gets answers they can trust.</span><button onClick={() => setNotice("Your assistant is ready to help your community.")}>How it works <ArrowRight size={14} /></button></div>
-          <footer className="page-footer"><span>© 2025 Kindred AI</span><span>Built with care for communities everywhere <span className="footer-heart">♥</span></span><button onClick={() => setNotice("Your knowledge base is private and only used to answer your community’s questions.")}><ShieldCheck size={13} /> Privacy first</button><button onClick={() => setNotice("Your assistant is ready to help your community.")}><ArrowDownToLine size={13} /> Export data</button></footer>
+          <footer className="page-footer"><span>© 2025 Kindred AI</span><span>Built with care for communities everywhere <span className="footer-heart">♥</span></span><button onClick={() => setNotice("Your knowledge base is private and only used to answer your community’s questions.")}><ShieldCheck size={13} /> Privacy first</button><button onClick={() => setNotice("Your assistant is ready to help your community.")}><ArrowDownToLine size={13} /> Export data</button></footer></>}
         </div>
       </section>
     </main>
