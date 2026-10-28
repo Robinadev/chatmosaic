@@ -45,11 +45,9 @@ type ChatThreadProps = {
 function MessageRow({
   message,
   assistantName,
-  publicMode,
 }: {
   message: ChatMessageSummary;
   assistantName: string;
-  publicMode: boolean;
 }) {
   const isUser = message.role === "user";
   const align = isUser ? "end" : "start";
@@ -87,7 +85,6 @@ export function ChatThread({
   welcomeMessage,
   pendingQuestion,
   isPending = false,
-  publicMode = false,
   onSuggestion,
 }: ChatThreadProps) {
   const greeting: ChatMessageSummary = {
@@ -109,7 +106,7 @@ export function ChatThread({
         >
           <MessageScroller.Content className="message-scroller-content">
             <MessageScroller.Item messageId={greeting.id}>
-              <MessageRow message={greeting} assistantName={assistantName} publicMode={publicMode} />
+              <MessageRow message={greeting} assistantName={assistantName} />
             </MessageScroller.Item>
             {messages.map((message) => (
               <MessageScroller.Item
@@ -117,7 +114,7 @@ export function ChatThread({
                 messageId={message.id}
                 scrollAnchor={message.role === "user"}
               >
-                <MessageRow message={message} assistantName={assistantName} publicMode={publicMode} />
+                <MessageRow message={message} assistantName={assistantName} />
               </MessageScroller.Item>
             ))}
             {messages.length === 0 && onSuggestion && (

@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import Link from "next/link";
 import { HeartHandshake, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { ChatComposer } from "@/components/chat/chat-composer";
 import { ChatThread } from "@/components/chat/chat-thread";
-import type { ChatMessageSummary, SourceDocumentReference } from "@/lib/types";
+import type { ChatMessageSummary } from "@/lib/types";
+import type { SourceDocumentReference } from "@/lib/db/schema";
 
 type PublicAssistantProps = {
   assistant: {
@@ -74,18 +76,16 @@ export function PublicAssistant({ assistant }: PublicAssistantProps) {
   }
 
   const accentStyle = {
-    "--primary": assistant.accentColor,
-    "--green": assistant.accentColor,
     "--assistant-accent": assistant.accentColor,
   } as CSSProperties;
 
   return (
     <main className="public-assistant-page" style={accentStyle}>
       <header className="public-assistant-header">
-        <a className="brand" href="/" aria-label="ChatMosaic home">
+        <Link className="brand" href="/" aria-label="ChatMosaic home">
           <span className="brand-mark"><HeartHandshake aria-hidden="true" /></span>
           <span>ChatMosaic<span className="brand-period">.</span></span>
-        </a>
+        </Link>
         <span className="powered-by">Community assistant</span>
       </header>
       <section className="public-assistant-card">
@@ -94,7 +94,7 @@ export function PublicAssistant({ assistant }: PublicAssistantProps) {
           <div>
             <span className="eyebrow">{assistant.organizationName}</span>
             <h1>{assistant.assistantName}</h1>
-            <p>{assistant.welcomeMessage}</p>
+            <p>Ask a question about the organization’s published resources.</p>
           </div>
         </div>
         <div className="public-chat-panel">
@@ -104,7 +104,6 @@ export function PublicAssistant({ assistant }: PublicAssistantProps) {
             welcomeMessage={assistant.welcomeMessage}
             pendingQuestion={pendingQuestion}
             isPending={isPending}
-            publicMode
           />
           <ChatComposer
             disabled={isPending}

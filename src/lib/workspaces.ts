@@ -35,7 +35,7 @@ export async function getOrCreateWorkspace(userId: string): Promise<WorkspaceRec
     .values({
       id: randomUUID(),
       userId,
-      shareSlug: randomUUID().replaceAll("-", "").slice(0, 18),
+      shareSlug: randomUUID().replace(/-/g, "").slice(0, 18),
     })
     .onConflictDoNothing({ target: workspaces.userId })
     .returning();

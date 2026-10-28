@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { Copy, Download, ExternalLink, Globe2, LockKeyhole, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -52,13 +52,33 @@ function getDraft(workspace: WorkspaceSummary): SettingsDraft {
   };
 }
 
+function escapeAttribute(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/\"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function subscribeToLocation() {
+  return () => undefined;
+}
+
+function getBrowserOrigin() {
+  return window.location.origin;
+}
+
+function getServerOrigin() {
+  return "";
+}
+
 export function SettingsPanel({ workspace, onUpdate }: SettingsPanelProps) {
   const [draft, setDraft] = useState(() => getDraft(workspace));
   const [saving, setSaving] = useState(false);
-  const [origin, setOrigin] = useState("");
+  const origin = useSyncExternalStore(subscribeToLocation, getBrowserOrigin, getServerOrigin);
   const sharePath = `/assistant/${workspace.shareSlug}`;
   const shareUrl = origin ? `${origin}${sharePath}` : sharePath;
-  const embedCode = `<iframe src="${shareUrl}" title="${workspace.assistantName}" width="100%" height="680" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" style="border:0;border-radius:16px"></iframe>`;
+  const embedCode = `<iframe src="${shareUrl}" title="${escapeAttribute(workspace.assistantName)}" width="100%" height="680" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" style="border:0;border-radius:16px"></iframe>`;
   const dirty =
     draft.name !== workspace.name ||
     draft.assistantName !== workspace.assistantName ||
@@ -66,9 +86,6 @@ export function SettingsPanel({ workspace, onUpdate }: SettingsPanelProps) {
     draft.accentColor !== workspace.accentColor ||
     draft.isPublic !== workspace.isPublic;
 
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
 
   function updateDraft<K extends keyof SettingsDraft>(key: K, value: SettingsDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -112,7 +129,8 @@ export function SettingsPanel({ workspace, onUpdate }: SettingsPanelProps) {
       );
       if (!confirmed) return;
       try {
-        await onUpdate({ isPublic: true });
+        const updated = await onUpdate({ isPublic: true });
+        setDraft(getDraft(updated));
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "The assistant could not be published.");
         return;
